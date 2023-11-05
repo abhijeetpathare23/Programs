@@ -1,40 +1,59 @@
 #include <stdio.h>
 #include <stdlib.h>
-int main()
-{
-int len, f_size, i = 0, fault = 0, hit = 0, num, j, res = 0, flag;
-printf("Enter String Length: ");
-scanf("%d", &len);
-printf("Enter Frame Size: ");
-scanf("%d", &f_size);
-int arr[len], frame[f_size];
-printf("Enter Stream: \n");
-for (j = 0; j < len; j++) {
-scanf("%d", &arr[j]);
+#include <pthread.h>
+#define BUFFER_SIZE 20
+#define MAX_ITEMS 20
+int buffer[BUFFER_SIZE];
+int in = 0;
+int out = 0;
+int produced_count = 0;
+int consumed_count = 0;
+pthread_mutex_t mutex;
+pthread_cond_t full;
+pthread_cond_t empty;
+void* producer(void* arg) {
+int item = 1;
+while (produced_count < MAX_ITEMS) {
+pthread_mutex_lock(&mutex);
+while (((in + 1) % BUFFER_SIZE) == out) {
+pthread_cond_wait(&empty, &mutex);
 }
-while (i != len)
-{
-flag = 0;
-num = arr[i];
-for (j = 0; j < f_size; j++)
-{
-if (num == frame[j])
-{
-flag = 1;
+buffer[in] = item;
+printf("\nProduced: %d", item);
+item++;
+in = (in + 1) % BUFFER_SIZE;
+produced_count++;
+pthread_cond_signal(&full);
+pthread_mutex_unlock(&mutex);
 }
+pthread_exit(NULL);
 }
-if (flag == 1)
-{
-hit++;
-} else {
-frame[res] = num;
-res++;
-res = res % f_size;
-fault++;
+void* consumer(void* arg) {
+while (consumed_count < MAX_ITEMS) {
+pthread_mutex_lock(&mutex);
+while (in == out) {
+pthread_cond_wait(&full, &mutex);
 }
-i++;
+int item = buffer[out];printf("\nConsumed: %d", item);
+printf("\n");
+out = (out + 1) % BUFFER_SIZE;
+consumed_count++;
+pthread_cond_signal(&empty);
+pthread_mutex_unlock(&mutex);
 }
-printf("Page Fault: %d\n", fault);
-printf("Page Hits: %d",hit);
+pthread_exit(NULL);
+}
+int main() {
+pthread_t producerThread, consumerThread;
+pthread_mutex_init(&mutex, NULL);
+pthread_cond_init(&full, NULL);
+pthread_cond_init(&empty, NULL);
+pthread_create(&producerThread, NULL, producer, NULL);
+pthread_create(&consumerThread, NULL, consumer, NULL);
+pthread_join(producerThread, NULL);
+pthread_join(consumerThread, NULL);
+pthread_mutex_destroy(&mutex);
+pthread_cond_destroy(&full);
+pthread_cond_destroy(&empty);
 return 0;
 }
